@@ -1,4 +1,3 @@
-
 name: Build and Push Docker Image
 
 on:
@@ -29,6 +28,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./tp3              # مجلد يحتوي Dockerfile
+          file: ./tp3/Dockerfile      # تحديد موقع ملف Dockerfile
           push: true
           tags: chiraz230/big-data-tp3:latest
