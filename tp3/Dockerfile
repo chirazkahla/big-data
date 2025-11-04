@@ -11,4 +11,5 @@ COPY . .
 RUN pip install --no-cache-dir -r requirements.txt || true
 
 # الأمر الافتراضي لتشغيل التطبيق (يمكنك تعديله)
-CMD ["python3"]
+CMD ["python3", "app.py"]
+
