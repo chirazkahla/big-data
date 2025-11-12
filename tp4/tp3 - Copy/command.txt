@@ -1,0 +1,10 @@
+docker build --no-cache -t chiraz230/big-data-tp3 .
+docker network create tp3_mynetwork
+docker run -d --name cont1 --network tp3_mynetwork -p 8081:80 chiraz230/big-data-tp3
+docker run -d --name cont2 --network tp3_mynetwork -p 8082:80 chiraz230/big-data-tp3
+docker run -d --name cont3 --network tp3_mynetwork -p 8083:80 chiraz230/big-data-tp3
+docker ps
+docker logs cont1
+docker compose up -d
+docker exec -it cont1 /bin/bash 
+ping cont2
