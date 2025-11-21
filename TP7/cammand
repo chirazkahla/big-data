@@ -1,0 +1,132 @@
+
+
+### ✔ تحميل Kafka
+
+
+```
+kafka_2.13-3.4.0
+```
+
+### ✔ تشغيل Zookeeper
+
+
+```cmd
+.\bin\windows\zookeeper-server-start.bat .\config\zookeeper.properties
+```
+
+---
+
+## 📌 2. تشغيل Broker واحد (اختياري)
+
+```cmd
+.\bin\windows\kafka-server-start.bat .\config\server.properties
+```
+
+---
+
+# 📌 3. إنشاء Cluster بثلاثة Brokers
+
+### ✔ نسخ ملفات الإعدادات
+
+
+* `server-0.properties`
+* `server-1.properties`
+* `server-2.properties`
+
+### ✔ أهم التعديلات:
+
+### **server-0.properties**
+
+```properties
+broker.id=0
+listeners=PLAINTEXT://:9092
+log.dirs=C:/kafka_2.13-3.4.0/logs0
+zookeeper.connect=localhost:2181
+```
+
+### **server-1.properties**
+
+```properties
+broker.id=1
+listeners=PLAINTEXT://:9093
+log.dirs=C:/kafka_2.13-3.4.0/logs1
+zookeeper.connect=localhost:2181
+```
+
+### **server-2.properties**
+
+```properties
+broker.id=2
+listeners=PLAINTEXT://:9094
+log.dirs=C:/kafka_2.13-3.4.0/logs2
+zookeeper.connect=localhost:2181
+```
+
+### ✔ تشغيل الـ brokers الثلاثة:
+
+#### Broker 0
+
+```cmd
+.\bin\windows\kafka-server-start.bat .\config\server-0.properties
+```
+
+#### Broker 1
+
+```cmd
+.\bin\windows\kafka-server-start.bat .\config\server-1.properties
+```
+
+#### Broker 2
+
+```cmd
+.\bin\windows\kafka-server-start.bat .\config\server-2.properties
+```
+
+---
+
+# 📌 4. إنشاء Topic مع Replication Factor = 3
+
+```cmd
+.\bin\windows\kafka-topics.bat --bootstrap-server localhost:9092 --create --topic machines --partitions 3 --replication-factor 3
+```
+
+### ✔ التحقق من الـ topic
+
+```cmd
+.\bin\windows\kafka-topics.bat --bootstrap-server localhost:9092 --describe --topic machines
+```
+
+النتيجة:
+
+```
+Replicas: 0,1,2
+Isr: 0,1,2
+```
+
+---
+
+# 📌 5. تشغيل Consumer لقراءة بيانات الـ IoT
+
+```cmd
+.\bin\windows\kafka-console-consumer.bat --bootstrap-server localhost:9092 --topic machines --from-beginning
+```
+  
+### ✔ تشغيل الـ producer
+
+```cmd
+python iot_producer.py
+```
+
+---
+
+# 📌 7. تشغيل Consumer لعرض بيانات الآلات
+
+```cmd
+.\bin\windows\kafka-console-consumer.bat --bootstrap-server localhost:9092 --topic machines --from-beginning
+```
+
+
+```
+{"machine_id": "M1", "temperature": 82.52, "vibration": 1.38, "timestamp": "..."}
+```
+
