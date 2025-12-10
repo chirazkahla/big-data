@@ -1,0 +1,351 @@
+
+
+## ✔ تثبيت Java 11
+```bash
+sudo apt update
+sudo apt install openjdk-11-jdk -y
+````
+
+### التحقق:
+
+```bash
+java -version
+```
+
+---
+
+## ✔ تثبيت Maven
+
+```bash
+sudo apt install maven -y
+```
+
+### التحقق:
+
+```bash
+mvn -v
+```
+
+---
+
+## ✔ تحميل Hadoop 3.3.1
+
+```bash
+cd ~
+wget https://archive.apache.org/dist/hadoop/core/hadoop-3.3.1/hadoop-3.3.1.tar.gz
+tar -xzf hadoop-3.3.1.tar.gz
+mv hadoop-3.3.1 hadoop
+```
+
+---
+
+## ✔ ضبط متغيرات البيئة في `~/.bashrc`
+
+```bash
+nano ~/.bashrc
+```
+
+أضف:
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+export HADOOP_HOME=$HOME/hadoop
+export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export PATH=$PATH:$JAVA_HOME/bin:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+```
+
+ثم:
+
+```bash
+source ~/.bashrc
+```
+
+---
+
+## ✔ تعديل hadoop-env.sh
+
+```bash
+nano ~/hadoop/etc/hadoop/hadoop-env.sh
+```
+
+أضف:
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+```
+
+---
+
+## ✔ تهيئة HDFS لأول مرة
+
+```bash
+hdfs namenode -format
+```
+
+---
+
+# 🟧 1. تشغيل Hadoop (HDFS + YARN)
+
+### تشغيل HDFS:
+
+```bash
+start-dfs.sh
+```
+
+### تشغيل YARN:
+
+```bash
+start-yarn.sh
+```
+
+### التأكد:
+
+```bash
+jps
+```
+
+يجب أن يظهر:
+
+* NameNode
+* DataNode
+* SecondaryNameNode
+* ResourceManager
+* NodeManager
+
+---
+
+# 🟩 2. رفع ملف إلى HDFS
+
+### إنشاء الملف:
+
+```bash
+echo "Hello Spark Wordcount!" > file1.txt
+echo "Hello Hadoop Also :)" >> file1.txt
+```
+
+### رفع الملف:
+
+```bash
+hdfs dfs -put file1.txt /
+```
+
+### التأكد:
+
+```bash
+hdfs dfs -ls /
+```
+
+---
+
+# 🟨 3. WordCount عبر Spark-shell (RDD)
+
+### تشغيل Spark-shell:
+
+```bash
+spark-shell
+```
+
+### تنفيذ WordCount:
+
+```scala
+val lines = sc.textFile("hdfs://localhost:9000/file1.txt")
+val words = lines.flatMap(_.split("\\s+"))
+val wc = words.map(w => (w, 1)).reduceByKey(_ + _)
+wc.saveAsTextFile("hdfs://localhost:9000/file1.count")
+```
+
+### الخروج:
+
+```scala
+:quit
+```
+
+### عرض النتائج:
+
+```bash
+hdfs dfs -cat /file1.count/part-00000
+hdfs dfs -cat /file1.count/part-00001
+```
+
+---
+
+# 🟦 4. Spark Batch – Java + Maven
+
+### إنشاء مشروع Maven:
+
+```bash
+mvn archetype:generate -DgroupId=spark.batch \
+-DartifactId=wordcount-spark \
+-DarchetypeArtifactId=maven-archetype-quickstart \
+-DinteractiveMode=false
+```
+
+### الدخول للمشروع:
+
+```bash
+cd wordcount-spark
+```
+
+### حذف test الافتراضي:
+
+```bash
+rm src/test/java/spark/batch/AppTest.java
+```
+
+---
+
+## ✔ ملف Java الأساسي: `WordCountTask.java`
+
+ضعه في:
+
+```
+src/main/java/spark/batch/WordCountTask.java
+```
+
+```java
+package spark.batch;
+
+import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaPairRDD;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
+
+import scala.Tuple2;
+import java.util.Arrays;
+
+public class WordCountTask {
+
+    public static void main(String[] args) {
+
+        if (args.length < 2) {
+            System.err.println("Usage: WordCountTask <input> <output>");
+            System.exit(1);
+        }
+
+        String inputPath = args[0];
+        String outputPath = args[1];
+
+        SparkConf conf = new SparkConf().setAppName("WordCountTask").setMaster("local[*]");
+        JavaSparkContext sc = new JavaSparkContext(conf);
+
+        JavaRDD<String> textFile = sc.textFile(inputPath);
+
+        JavaPairRDD<String, Integer> counts = textFile
+                .flatMap(s -> Arrays.asList(s.split("\\s+")).iterator())
+                .mapToPair(word -> new Tuple2<>(word, 1))
+                .reduceByKey((a, b) -> a + b);
+
+        counts.saveAsTextFile(outputPath);
+
+        sc.close();
+    }
+}
+```
+
+---
+
+## ✔ بناء المشروع:
+
+```bash
+mvn package
+```
+
+---
+
+## ✔ تشغيل التطبيق:
+
+```bash
+spark-submit --class spark.batch.WordCountTask \
+  target/wordcount-spark-1.0-SNAPSHOT.jar \
+  hdfs://localhost:9000/file1.txt \
+  hdfs://localhost:9000/wc-output
+```
+
+---
+
+## ✔ عرض النتائج:
+
+```bash
+hdfs dfs -cat /wc-output/part-00000
+hdfs dfs -cat /wc-output/part-00001
+```
+
+---
+
+# 🟥 5. Spark Structured Streaming + Netcat
+
+## ✔ إنشاء ملف streaming.py داخل المشروع:
+
+```
+wordcount-spark/streaming.py
+```
+
+```python
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import explode, split
+
+spark = SparkSession.builder \
+    .appName("StructuredStreamingWordCount") \
+    .getOrCreate()
+
+lines = spark.readStream \
+    .format("socket") \
+    .option("host", "localhost") \
+    .option("port", 9999) \
+    .load()
+
+words = lines.select(
+    explode(
+        split(lines.value, " ")
+    ).alias("word")
+)
+
+wordCounts = words.groupBy("word").count()
+
+query = wordCounts.writeStream \
+    .outputMode("complete") \
+    .format("console") \
+    .start()
+
+query.awaitTermination()
+```
+
+---
+
+## ✔ تشغيل netcat (نافذة 1):
+
+```bash
+nc -lk 9999
+```
+
+## ✔ تشغيل الـ Streaming (نافذة 2):
+
+```bash
+cd ~/wordcount-spark
+spark-submit streaming.py
+```
+
+## ✔ إرسال البيانات:
+
+```
+hello spark
+hello streaming
+spark test
+```
+
+
+
+```
++----------+-----+
+| word     |count|
++----------+-----+
+|hello     |2    |
+|spark     |3    |
+|streaming |1    |
+|test      |1    |
++----------+-----+
+```
+
+---
+
+
